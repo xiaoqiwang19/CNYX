@@ -1,0 +1,3 @@
+TypeError in line 6 of /public/wangxiaoqi/WES_PIPLINE/snakemake_dir/scripts/Snakefile:
+'module' object is not subscriptable
+  File "/public/wangxiaoqi/WES_PIPLINE/snakemake_dir/scripts/Snakefile", line 6, in <module>
