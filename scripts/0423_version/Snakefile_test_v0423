@@ -1,0 +1,43 @@
+import os
+import yaml
+import sys
+
+
+print(workflow.snakefile)
+
+sample_all=config['sample_all']
+
+fastp_dir = "/public/wangxiaoqi/WES_PIPLINE/snakemake_dir/tmp_test/demo_test1_0422/fastp_dir1"
+fastp = "/usr/local/bin/fastp"
+
+prodir="/public/wangxiaoqi/WES_PIPLINE/snakemake_dir/tmp_test/demo_test1_0423"
+os.chdir(prodir)
+
+os.mkdir("raw_dir_test")
+os.mkdir("fastp_dir1")
+
+raw_dir=prodir + "/raw_dir_test" 
+
+for each in sample_all:
+    #print(each,config[each])
+    read=config[each].split(",")
+    os.system("ln -s %s %s" %(read[0], raw_dir+"/" + each+ "_R1.fastq.gz"))
+    os.system("ln -s %s %s" %(read[1], raw_dir+"/" + each+ "_R2.fastq.gz"))
+
+SAMPLES, = glob_wildcards(raw_dir + "/{sample}_R1.fastq.gz")
+print(SAMPLES)
+NB_SAMPLES = len(SAMPLES)
+
+rule ALL:
+  input: expand("fastp_dir1/{sample}_R1_fp.fastq.gz", sample=SAMPLES)
+   
+rule test:
+  input:
+    reads1="raw_dir_test/{sample}_R1.fastq.gz",reads2="raw_dir_test/{sample}_R2.fastq.gz"
+  params:
+    json="fastp_dir1/{sample}_fastp.json",html="fastp_dir1/{sample}_fastp.html"
+  output:
+    reads1="fastp_dir1/{sample}_R1_fp.fastq.gz",reads2="fastp_dir1/{sample}_R2_fp.fastq.gz"
+  shell:
+    "{fastp} -i {input.reads1} -I {input.reads2} -o {output.reads1} -O {output.reads2} "
+    "-j {params.json} -h {params.html} "

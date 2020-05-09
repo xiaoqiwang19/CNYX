@@ -1,0 +1,225 @@
+import os
+import yaml
+import sys
+from config import config as cg
+##################
+#software  公共数据库：软件
+fastp = cg.CFG['external_app.fastp']['exec']
+samtools = cg.CFG['external_app.samtools']['exec']
+gatk = cg.CFG['external_app.gatk']['exec']
+bwa = cg.CFG['external_app.bwa']['exec']
+python = cg.CFG['external_app.python']['exec']
+
+#globlefiles  公共数据库：脚本和数据库
+ref = cg.CFG['database.hg19']['fasta']
+mi_kg =  cg.CFG['database.annotation']['Mills_and_1000G_gold_standard.indels.hg19.sites.vcf.gz']
+kg_phase1_indel = cg.CFG['database.annotation']['1000G_phase1.indels.hg19.sites.vcf.gz']
+kg_phase1_snp = cg.CFG['database.annotation']['1000G_phase1.snps.high_confidence.hg19.sites.vcf.gz']
+dbsnp = cg.CFG['database.annotation']['dbsnp_138.hg19.vcf.gz']
+hapmap = cg.CFG['database.annotation']['hapmap_3.3.hg19.sites.vcf.gz']
+kg_omni = cg.CFG['database.annotation']['1000G_omni2.5.hg19.sites.vcf.gz']
+
+###  --configfile test.yaml   从这个文件里面传递参数  sample,read1,read2,project_dir
+samples=config['samples']
+fastp_dir=config['project_dir'] + "/fastp" 
+log=config['project_dir'] + "/log"
+raw_dir=config['project_dir'] + "/rawdata"
+bwa_dir=config['project_dir'] + "/bwa"
+GATK_BQ_dir=config['project_dir'] + "/GATK_BQ"
+GATK_CALL_dir=config['project_dir'] + "/GATK_CALL"
+GATK_SELECT_dir=config['project_dir'] + "/GATK_SELECT"
+GATK_FILTER_dir=config['project_dir'] + "/GATK_FILTER"
+
+filter_type="hardfiter"  #可以根据样本数进行选择，如果样本数（WES）大于30个选择vqsr,小于30个则选择hardfiter
+
+#获取Snakefile路径，同路径下放置该流程的所有自写脚本
+scripts_PATH=os.path.dirname(workflow.snakefile)
+pre_c = scripts_PATH + "/pre_data.py"
+gatk_vqsr_wrapper = scripts_PATH + "/gatk_vqsr_wrapper.py"
+gatk_HaplotypeCaller = scripts_PATH + "/gatk_HaplotypeCaller.py"
+
+
+
+rule All:
+    input:
+        os.path.join(bwa_dir, sample + ".bwa.bam"), 
+        os.path.join(bwa_dir, sample + ".bwa.sort.bam.bai"),
+        os.path.join(bwa_dir, sample + ".bwa.sort.markdup.bam"),   
+        os.path.join(GATK_BQ_dir, sample + ".recal_data.table"),
+        os.path.join(GATK_BQ_dir, sample + ".recal.reads.bam"),
+        os.path.join(GATK_CALL_dir, sample + ".g.vcf.gz"), 
+        os.path.join(GATK_SELECT_dir, sample + ".raw.snp.vcf.gz"),
+        os.path.join(GATK_SELECT_dir, sample + ".raw.indel.vcf.gz"),
+        os.path.join(GATK_FILTER_dir, sample + ".clean.snp.vcf.gz"),
+        os.path.join(GATK_FILTER_dir, sample + ".clean.indel.vcf.gz")
+
+rule prepare:
+    input: 
+        reads1=config['reads1'], reads2=config['reads2']
+    output:
+        reads_o_1=os.path.join(raw_dir, sample + "_R1.fastq.gz"),
+        reads_o_2=os.path.join(raw_dir, sample + "_R2.fastq.gz")
+    log: {log}
+    shell:
+        "python {pre_c} {input.reads1} {output.reads_o_1} {input.reads2}  {output.reads_o_2}"
+
+#多样本
+rule prepare:
+    input:
+        reads1=config['reads1'], reads2=config['reads2']
+    output:
+        reads_o_1=os.path.join(raw_dir, sample + "_R1.fastq.gz"),
+        reads_o_2=os.path.join(raw_dir, sample + "_R2.fastq.gz")
+    log: {log}
+    shell:
+        "python {pre_c} {input.reads1} {output.reads_o_1} {input.reads2}  {output.reads_o_2}"
+
+
+rule fastp:
+    input: 
+        reads1=os.path.join(raw_dir, sample + "_R1.fastq.gz"),
+        reads2=os.path.join(raw_dir, sample + "_R2.fastq.gz")
+    params:
+        json=os.path.join(fastp_dir,sample + ".fastp.json"),
+        html=os.path.join(fastp_dir, sample + ".fastp.html"),
+        record=os.path.join(fastp_dir, sample + ".fastp.record.xls")
+    output:
+        reads1=os.path.join(fastp_dir, sample + "_R1_fp.fastq.gz"),
+        reads2=os.path.join(fastp_dir, sample + "_R2_fp.fastq.gz")
+    log: {log}
+    shell:
+        "{fastp} -i {input.reads1} -I {input.reads2} -o {output.reads1} -O {output.reads2} "
+         "-j {params.json} -h {params.html}  >{log} 2>&1 "
+
+rule bwa:
+  input: 
+      reads1=rules.fastp.output.reads1, reads2=rules.fastp.output.reads2
+  params:
+      para=f'"@RG\\tID:{sample}\\tLB:{sample}\\tSM:{sample}\\tPL:ILLUMINA"'
+  output:
+      bam=os.path.join(bwa_dir, sample + ".bwa.bam")
+  log:
+      bwa={log}
+  benchmark: os.path.join(bwa_dir,sample + ".bwa.benchmark")
+  shell:
+    "{bwa} mem {ref} {input.reads1} {input.reads2} "
+    "-M -t 4 -R {params.para} |{samtools} view -bS /dev/stdin  -o  {output.bam} "
+
+rule bamSortIndex:
+  input: rules.bwa.output
+  params: ""
+  output:
+      bam=os.path.join(bwa_dir, sample + ".bwa.sort.bam"),
+      index=os.path.join(bwa_dir, sample + ".bwa.sort.bam.bai")
+  log: {log}
+  benchmark: os.path.join(bwa_dir,sample + ".samtools.benchmark")
+  shell:
+    "{samtools} sort -o {output.bam} {input} > {log} 2>&1 "
+    "&& {samtools} index {output.bam} >> {log} 2>&1 "
+
+
+rule gatk_markdup:
+  input: rules.bamSortIndex.output.bam
+  params: ""
+  output:
+      bam=os.path.join(bwa_dir, sample + ".bwa.sort.markdup.bam"),
+      metrics=os.path.join(bwa_dir, sample + ".metrics")
+  log: {log}
+  benchmark: os.path.join(bwa_dir,sample + ".markdup.benchmark")
+  shell:
+      "{gatk}  MarkDuplicates -I  {input} -O {output.bam} -M {output.metrics}"
+
+
+rule gatk_BaseRecalibrator:
+  input: rules.gatk_markdup.output.bam
+  params:
+      para=f'"-Xmx2G -Djava.io.tmpdir={GATK_BQ_dir}"'
+  output:
+      table=os.path.join(GATK_BQ_dir, sample + ".recal_data.table")
+  log: {log}
+  benchmark: os.path.join(GATK_BQ_dir, sample + ".BaseRecalibrator.benchmark")
+  shell: 
+      "{gatk} --java-options {params.para}  BaseRecalibrator  -I {input} -R {ref} --known-sites {dbsnp}  -O {output}"
+
+rule gatk_ApplyBQSR:
+  input: 
+      bam=rules.gatk_markdup.output.bam,
+      table=rules.gatk_BaseRecalibrator.output.table
+  params:
+      para=f'"-Xmx2G -Djava.io.tmpdir={GATK_BQ_dir}"'
+  output:
+      bam=os.path.join(GATK_BQ_dir, sample + ".recal.reads.bam")
+  log: {log}
+  benchmark: os.path.join(GATK_BQ_dir, sample + ".ApplyBQSR.benchmark")
+  shell:
+    "{gatk} --java-options {params.para}  ApplyBQSR -I {input.bam} -R {ref} -bqsr {input.table}  -O {output.bam}"
+
+
+#这一步需要的时间较长,按染色体进行拆分进行call变异节约时间
+rule gatk_HaplotypeCaller:
+  input:
+      bam=rules.gatk_ApplyBQSR.output.bam
+  params:
+      para=f'"-Xmx2G -Djava.io.tmpdir={GATK_CALL_dir}"'
+  output:
+      vcf=os.path.join(GATK_CALL_dir, sample + ".g.vcf.gz")
+  log: {log}
+  benchmark: os.path.join(GATK_CALL_dir, sample + ".HaplotypeCaller.benchmark")
+  shell:
+     "{python} {gatk_HaplotypeCaller} --input_file  {input.bam} --out_dir {GATK_CALL_dir} --split_chr yes"
+
+
+rule gatk_GenotypeGVCFs:
+  input:
+      vcf=rules.gatk_HaplotypeCaller.output.vcf
+  params:
+      para=f'"-Xmx2G -Djava.io.tmpdir={GATK_CALL_dir}"'
+  output:
+      vcf=os.path.join(GATK_CALL_dir, sample + ".raw.vcf.gz")
+  log: {log}
+  benchmark: os.path.join(GATK_CALL_dir, sample + ".GenotypeGVCFs.benchmark")
+  shell:
+      "{gatk}  --java-options  {params.para}  GenotypeGVCFs -R {ref} -V {input.vcf}  -O  {output.vcf} "
+
+rule gatk_SelectVariants_snp:
+  input:
+      vcf=rules.gatk_GenotypeGVCFs.output.vcf
+  params:
+      para=f'"-Xmx2G -Djava.io.tmpdir={GATK_SELECT_dir}"'
+  output:
+      vcf=os.path.join(GATK_SELECT_dir, sample + ".raw.snp.vcf.gz")
+  log: {log}
+  benchmark: os.path.join(GATK_CALL_dir, sample + ".SelectVariants_snp.benchmark")
+  shell:
+      "{gatk}  --java-options {params.para}  SelectVariants -R {ref} -V {input.vcf}  -select-type SNP -O {output.vcf}"
+
+rule gatk_SelectVariants_indel:
+  input:
+      vcf=rules.gatk_GenotypeGVCFs.output.vcf
+  params:
+      para=f'"-Xmx2G -Djava.io.tmpdir={GATK_SELECT_dir}"'  
+  output:
+      vcf=os.path.join(GATK_SELECT_dir, sample + ".raw.indel.vcf.gz")
+  log: {log}
+  benchmark: os.path.join(GATK_SELECT_dir, sample + ".SelectVariants_indel.benchmark")
+  shell:
+      "{gatk}  --java-options {params.para}  SelectVariants -R {ref} -V {input.vcf}  -select-type INDEL -O {output.vcf}"
+
+
+#filter  如果是单个样本的话用hardfiter;如果用vqsr模式需要多个样本(gatk建议WES样本的话需要至少30个以上)
+
+
+rule gatk_filter:
+  input:
+      raw_snp=rules.gatk_SelectVariants_snp.output,
+      raw_indel=rules.gatk_SelectVariants_indel.output
+  params:
+      para=f'"-Xmx2G -Djava.io.tmpdir={GATK_FILTER_dir}"'
+  output:
+      clean_snp=os.path.join(GATK_FILTER_dir, sample + ".clean.snp.vcf.gz"),
+      clean_indel=os.path.join(GATK_FILTER_dir, sample + ".clean.indel.vcf.gz")
+  log: {log}
+  benchmark: os.path.join(GATK_FILTER_dir, sample + ".SelectVariants_filter.benchmark")
+  shell:
+      "{python} {gatk_vqsr_wrapper} --raw_snp_file  {input.raw_snp}   --raw_indel_file {input.raw_indel}  --out_dir {GATK_FILTER_dir}   --filter_type {filter_type}  "
+
