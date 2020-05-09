@@ -1,3 +1,0 @@
-AttributeError in line 6 of /public/wangxiaoqi/WES_PIPLINE/snakemake_dir/scripts/Snakefile:
-'dict' object has no attribute 'CFG'
-  File "/public/wangxiaoqi/WES_PIPLINE/snakemake_dir/scripts/Snakefile", line 6, in <module>
