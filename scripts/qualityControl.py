@@ -118,4 +118,4 @@ if __name__ == '__main__':
         for k, v in get_fastp_info().items():
             print(f'fastp\t{k}\t{v}', file=f)
         for k, v in get_align_info(map_dict).items():
-            print(f'align\t{k}\t{v}', file=f)
+            print(f'bamdst\t{k}\t{v}', file=f)

@@ -1,4 +1,0 @@
-sample_all: [control,treat]
-
-control: /public/wangxiaoqi/WES_PIPLINE/snakemake_dir/tmp_test/test_demo/rawdata_demo_test/control_R1.fastq.gz,/public/wangxiaoqi/WES_PIPLINE/snakemake_dir/tmp_test/test_demo/rawdata_demo_test/control_R2.fastq.gz
-treat: /public/wangxiaoqi/WES_PIPLINE/snakemake_dir/tmp_test/test_demo/rawdata_demo_test/test_R1.fastq.gz,/public/wangxiaoqi/WES_PIPLINE/snakemake_dir/tmp_test/test_demo/rawdata_demo_test/test_R2.fastq.gz

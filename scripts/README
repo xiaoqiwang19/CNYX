@@ -1,0 +1,4 @@
+Snakefile_v  后缀以日期命名
+*.py         流程中需要的脚本
+Config_v0512.yaml  配置文件
+config       数据库，脚本，软件配置信息

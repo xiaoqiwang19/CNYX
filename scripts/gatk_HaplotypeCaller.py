@@ -96,12 +96,11 @@ class GATK_HaplotypeCaller():
               'chr20', 'chr21', 'chr22', 'chrX', 'chrY', 'chrM']
         java_shell = f"{self.gatk} " \
                      f"--java-options '-Xmx2G -Djava.io.tmpdir={gatk_hc_dir}' " \
-                     f"VariantRecalibrator -R {self.ref} -V  {raw_snp_file} " \
                      "HaplotypeCaller  " \
                      f"-R {self.reference}   " \
                      f"--emit-ref-confidence GVCF   " \
                      f"-I {input_file}   " \
-                     f"-O  ${gatk_hc_dir}/{sample}.g.vcf.gz "
+                     f"-O  {gatk_hc_dir}/{sample}.g.vcf.gz "
         subprocess.check_call(java_shell, shell=True, stdout=stdout, stderr=stderr)
         return f"{gatk_hc_dir}/{sample}.g.vcf.gz"
 

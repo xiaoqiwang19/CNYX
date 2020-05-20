@@ -8,15 +8,16 @@ import os
 import numpy as np
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-i', '--infile', help="the   fastp json file", type=str)
+parser.add_argument('-i', '--infile', help="the depth_distribution.plot file from bamdst", type=str)
 parser.add_argument('-s', '--sample', help="the sample", type=str)
+parser.add_argument('-o', '--outdir', help="the outdir", type=str)
 args = parser.parse_args()
 argv=vars(args)
  
 ####************** 目标区域测序深度图**********************#####
 infile = argv["infile"]
 sample = argv["sample"]
-
+outdir = argv["outdir"]
 a1 = pd.read_csv(infile,sep='\t',header=None)[0][0:501]
 b1 = pd.read_csv(infile,sep='\t',header=None)[2][0:501] * 100
 
@@ -52,7 +53,7 @@ plt.ylim(0,1.0)
 
 # 设置每个坐标轴的取值范围
 #plt.axis([0, 300, 0, 50])
-plt.savefig(sample + ".Sequence_depth_distribution.png")
+plt.savefig(outdir + "/"  + sample + ".Sequence_depth_distribution.png")
 plt.show()
 plt.close()
 
@@ -93,7 +94,7 @@ plt.ylim(0,100)
 
 # 设置每个坐标轴的取值范围
 #plt.axis([0, 300, 0, 50])
-plt.savefig(sample + ".Cumulative_sequence_depth_distribution.png")
+plt.savefig(outdir + "/"  + sample + ".Cumulative_sequence_depth_distribution.png")
 plt.show()
 
 

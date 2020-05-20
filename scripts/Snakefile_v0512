@@ -10,10 +10,11 @@ gatk = cg.CFG['external_app.gatk']['exec']
 bwa = cg.CFG['external_app.bwa']['exec']
 python = cg.CFG['external_app.python']['exec']
 qualimap  = cg.CFG['external_app.qualimap']['exec']
-
+bamdst = cg.CFG['external_app.bamdst']['exec']
 
 #globlefiles  公共数据库：脚本和数据库
 ref = cg.CFG['database.hg19']['fasta']
+bed = cg.CFG['target']['bed']
 mi_kg =  cg.CFG['database.annotation']['Mills_and_1000G_gold_standard.indels.hg19.sites.vcf.gz']
 kg_phase1_indel = cg.CFG['database.annotation']['1000G_phase1.indels.hg19.sites.vcf.gz']
 kg_phase1_snp = cg.CFG['database.annotation']['1000G_phase1.snps.high_confidence.hg19.sites.vcf.gz']
@@ -35,6 +36,8 @@ gatk_vqsr_wrapper = scripts_PATH + "/gatk_vqsr_wrapper.py"
 gatk_HaplotypeCaller = scripts_PATH + "/gatk_HaplotypeCaller.py"
 fastpJson2record = scripts_PATH + "/fastpJson2record.py"
 plt_fastp_qc = scripts_PATH + "/plt_fastp_qc.py"
+qualityControl = scripts_PATH + "/qualityControl.py"
+plt_bam_depth = scripts_PATH + "/plt_bam_depth.py"
 
 ###定义分析目录名称
 ###  --configfile test.yaml   从这个文件里面传递参数  sample,read1,read2,project_dir
@@ -46,6 +49,7 @@ GATK_BQ_dir=config['project_dir'] + "/03.GATK_BQ"
 GATK_CALL_dir=config['project_dir'] + "/04.GATK_CALL"
 GATK_SELECT_dir=config['project_dir'] + "/05.GATK_SELECT"
 GATK_FILTER_dir=config['project_dir'] + "/06.GATK_FILTER"
+ANNOVAR_dir=config['project_dir'] + "/07.annovar"
 
 def makesure_dir(dirname, *,
                  check_not_exist: bool = False,
@@ -74,7 +78,7 @@ for each_dir in [log_dir,raw_dir]:
     print(each_dir)
     makesure_dir(each_dir)
 
-dir_list=[fastp_dir,bwa_dir,GATK_BQ_dir,GATK_CALL_dir,GATK_SELECT_dir,GATK_FILTER_dir]
+dir_list=[fastp_dir,bwa_dir,GATK_BQ_dir,GATK_CALL_dir,GATK_SELECT_dir,GATK_FILTER_dir,ANNOVAR_dir]
 for each_dir in dir_list:
     makesure_dir(each_dir)
     for each_smp in sample_all:
@@ -85,7 +89,7 @@ for each in sample_all:
     #print(each,config[each])
     read=config[each].split(",")
     r1_ln, r2_ln = raw_dir+"/" + each+ "_R1.fastq.gz", raw_dir+"/" + each+ "_R2.fastq.gz"
-    print(read[0], read[1], r1_ln, r2_ln)
+    #print(read[0], read[1], r1_ln, r2_ln)
     os.system("python %s %s %s %s %s" %(pre_c, read[0], r1_ln, read[1], r2_ln))
 
 SAMPLES, = glob_wildcards(raw_dir + "/{sample}_R1.fastq.gz")
@@ -104,16 +108,29 @@ if  NB_SAMPLES <= 2:
 else:
     split_chr="no"
 
+split_chr="no"
+
 #log = "{log_dir}/log"
 rule All:
     input:
+        expand("01.fastp/{sample}/{sample}.fastp.state", sample=SAMPLES),
+        expand("02.bwa/{sample}/bamdst/{sample}.qc.tates",sample=SAMPLES),
+        expand("02.bwa/{sample}/qualimap/{sample}.qualimap.complete",sample=SAMPLES),
+        expand("07.annovar/{sample}/{sample}.annovar.myanno.hg19_multianno.vcf",sample=SAMPLES)
+
+
+"""
+
+
+
+        expand("02.bwa/{sample}/qualimap/{sample}.qualimap.complete",sample=SAMPLES),
+        expand("02.bwa/{sample}/qualimap/genome_results.txt",sample=SAMPLES),
         expand("01.fastp/{sample}/{sample}_R1_fp.fastq.gz", sample=SAMPLES),
         expand("01.fastp/{sample}/{sample}.fastp.state", sample=SAMPLES),
         expand("02.bwa/{sample}/{sample}.bwa.bam", sample=SAMPLES),
         expand("02.bwa/{sample}/{sample}.bwa.sort.bam.bai", sample=SAMPLES),
-        expand("02.bwa/{sample}/{sample}.bwa.sort.markdup.bam", sample=SAMPLES)
-
-"""
+        expand("02.bwa/{sample}/{sample}.bwa.sort.markdup.bam", sample=SAMPLES),
+        expand("02.bwa/{sample}/bamdst/{sample}.qc.tates",sample=SAMPLES),
         expand("03.GATK_BQ/{sample}/{sample}.recal_data.table", sample=SAMPLES),
         expand("03.GATK_BQ/{sample}/{sample}.recal.reads.bam", sample=SAMPLES),
         expand("04.GATK_CALL/{sample}/{sample}.g.vcf.gz", sample=SAMPLES),
@@ -121,10 +138,9 @@ rule All:
         expand("05.GATK_SELECT/{sample}/{sample}.raw.indel.vcf.gz", sample=SAMPLES),
         expand("06.GATK_FILTER/{sample}/{sample}.clean.snp.vcf.gz", sample=SAMPLES),
         expand("06.GATK_FILTER/{sample}/{sample}.clean.indel.vcf.gz",sample=SAMPLES),
-        expand("07.annovar/{sample}/{sample}.annovar.myanno.hg19_multianno.vcf",sample=SAMPLES),
-        expand("01.fastp/{sample}/{sample}.fastp.state",sample=SAMPLES),
-        expand("02.bwa/{sample}/{sample}.genome_results.txt",sample=SAMPLES)
+
 """
+
 
 #fastp质控
 rule fastp:
@@ -140,6 +156,7 @@ rule fastp:
         reads1="01.fastp/{sample}/{sample}_R1_fp.fastq.gz",
         reads2="01.fastp/{sample}/{sample}_R2_fp.fastq.gz",
         json="01.fastp/{sample}/{sample}.fastp.json"
+    benchmark: "log/{sample}/{sample}.fastp.benchmark"
     shell:
         "{fastp} -i {input.reads1} -I {input.reads2} -o {output.reads1} -O {output.reads2} "
         "-j {output.json} -h {params.html} >{log} 2>&1"
@@ -148,12 +165,15 @@ rule fastp_state:
     input:
         json=rules.fastp.output.json
     params:
-    log: "log/{sample}/{sample}.fastp.state.log"
+        outdir="01.fastp/{sample}"
+    log:
+        "log/{sample}/{sample}.fastp.state.log"
     output:
          state="01.fastp/{sample}/{sample}.fastp.state"
+    benchmark: "log/{sample}/{sample}.fastp.state.benchmark"
     shell:
         "{python} {fastpJson2record}  -i {input.json}  -o {output.state}  >{log}  2>&1 "
-        "&& {python} {plt_fastp_qc}  -i {input.json} >>{log}  2>&1"
+        "&& {python} {plt_fastp_qc}  -i {input.json} -o {params.outdir} >>{log}  2>&1 "
 
 #bwa比对
 rule bwa:
@@ -164,7 +184,7 @@ rule bwa:
     log: "log/{sample}/{sample}.bwa.log"
     output:
         bam="02.bwa/{sample}/{sample}.bwa.bam"
-    benchmark: "02.bwa/{sample}/{sample}.bwa.benchmark"
+    benchmark: "log/{sample}/{sample}.bwa.benchmark"
     shell:
         "{bwa} mem {ref} {input.reads1} {input.reads2} "
         "-M -t 4 -R {params.para} |{samtools} view -bS /dev/stdin  -o  {output.bam} >{log} 2>&1 "
@@ -177,7 +197,7 @@ rule bamSortIndex:
         bam="02.bwa/{sample}/{sample}.bwa.sort.bam",
         index="02.bwa/{sample}/{sample}.bwa.sort.bam.bai"
     log: "log/{sample}/{sample}.bwasort.log"
-    benchmark: "02.bwa/{sample}/{sample}.samtools.benchmark"
+    benchmark: "log/{sample}/{sample}.samtools.benchmark"
     shell:
        "{samtools} sort -o {output.bam} {input} > {log} 2>&1 "
        "&& {samtools} index {output.bam} >> {log} 2>&1 "
@@ -188,16 +208,18 @@ rule qualimap:
     input:
         bam="02.bwa/{sample}/{sample}.bwa.sort.bam"
     params:
-        out_dir="02.bwa/{sample}/{sample}"
+        out_dir="02.bwa/{sample}/qualimap",
     log:
         "log/{sample}/{sample}.qualimap.log"
     output:
-        genome_results="02.bwa/{sample}/{sample}.genome_results.txt"
+        qualimap_status="02.bwa/{sample}/qualimap/{sample}.qualimap.complete",
+        qualimap_result="02.bwa/{sample}/qualimap/genome_results.txt"
+    benchmark: "log/{sample}/{sample}.qualimap.benchmark"
     shell:
         "{qualimap}  bamqc -bam {input.bam} -gd  hg19 -gff {qualimap_gtf} \
-        --java-mem-size=5G  -nt 2 -outdir {params.out_dir} \
-        -outformat html "
-
+        --java-mem-size=5G  -nt 8 -outdir {params.out_dir} \
+        -outformat HTML >{log} 2>&1 "
+        "&& touch {output.qualimap_status} "
 
 #bam文件标记重复
 rule gatk_markdup:
@@ -207,14 +229,32 @@ rule gatk_markdup:
         bam="02.bwa/{sample}/{sample}.bwa.sort.markdup.bam",
         metrics="02.bwa/{sample}/{sample}.metrics"
     log: "log/{sample}/{sample}.markdup.log"
-    benchmark: "02.bwa/{sample}/{sample}.markdup.benchmark"
+    benchmark: "log/{sample}/{sample}.markdup.benchmark"
     shell:
         "{gatk}  MarkDuplicates -I  {input} -O {output.bam} -M {output.metrics} >{log} 2>&1"
 
-
 ####对bam结果进行统计
 
-
+rule bam_depth:
+    input:
+        bam="02.bwa/{sample}/{sample}.bwa.sort.markdup.bam",
+        fastpJson = rules.fastp.output.json
+    params:
+        out_dir="02.bwa/{sample}/bamdst",
+        coverage_report="02.bwa/{sample}/bamdst/coverage.report",
+        depth_distribution="02.bwa/{sample}/bamdst/depth_distribution.plot",
+        sample="{sample}"
+    log:
+        "log/{sample}/{sample}.bam_depth.log"
+    output:
+        qc_states="02.bwa/{sample}/bamdst/{sample}.qc.tates"
+    benchmark: "log/{sample}/{sample}.bam_depth.benchmark"
+    shell:
+        "if  [ ! -d params.out_dir ];then mkdir -p  {params.out_dir} ;fi "
+        "&& {bamdst} -p  {bed}  -o  {params.out_dir}   --cutoffdepth 10  --cutoffdepth 30  "
+        "--cutoffdepth 50  --cutoffdepth 100  --cutoffdepth 200 --cutoffdepth 500 {input.bam}  >{log} 2>&1"
+        "&& {python} {qualityControl} -j {input.fastpJson} -b {bed}  -c {params.coverage_report}  -o  {output.qc_states} "
+        "&& {python} {plt_bam_depth} -i {params.depth_distribution}  -s {params.sample} -o {params.out_dir} "
 
 #gatk BaseRecalibrator
 rule gatk_BaseRecalibrator:
@@ -224,7 +264,7 @@ rule gatk_BaseRecalibrator:
     output:
         table="03.GATK_BQ/{sample}/{sample}.recal_data.table"
     log: "log/{sample}/{sample}.BaseRecalibrator.log"
-    benchmark: "03.GATK_BQ/{sample}/{sample}.BaseRecalibrator.benchmark"
+    benchmark: "log/{sample}/{sample}.BaseRecalibrator.benchmark"
     shell:
         "{gatk} --java-options {params.para}  BaseRecalibrator  -I {input} -R {ref} "
         "--known-sites {dbsnp}  -O {output}  >{log} 2>&1"
@@ -240,7 +280,7 @@ rule gatk_ApplyBQSR:
     output:
         bam="03.GATK_BQ/{sample}/{sample}.recal.reads.bam"
     log: "log/{sample}/{sample}.ApplyBQSR.log"
-    benchmark: "03.GATK_BQ/{sample}/{sample}.ApplyBQSR.benchmark"
+    benchmark: "log/{sample}/{sample}.ApplyBQSR.benchmark"
     shell:
         "{gatk} --java-options {params.para}  ApplyBQSR -I {input.bam} "
         "-R {ref} -bqsr {input.table}  -O {output.bam} >{log} 2>&1"
@@ -256,7 +296,7 @@ rule gatk_HaplotypeCaller:
     output:
         vcf="04.GATK_CALL/{sample}/{sample}.g.vcf.gz"
     log: "log/{sample}/{sample}.HaplotypeCaller.log"
-    benchmark: "04.GATK_CALL/{sample}/{sample}.HaplotypeCaller.benchmark"
+    benchmark: "log/{sample}/{sample}.HaplotypeCaller.benchmark"
     shell:
         "{python} {gatk_HaplotypeCaller} --input_file  {input.bam} "
         "--out_dir {params.out_dir}  --split_chr {split_chr} >{log} 2>&1"
@@ -270,7 +310,7 @@ rule gatk_GenotypeGVCFs:
     output:
         vcf="04.GATK_CALL/{sample}/{sample}.raw.vcf.gz"
     log: "log/{sample}/{sample}.GenotypeGVCFs.log"
-    benchmark: "04.GATK_CALL/{sample}/{sample}.GenotypeGVCFs.benchmark"
+    benchmark: "log/{sample}/{sample}.GenotypeGVCFs.benchmark"
     shell:
         "{gatk}  --java-options  {params.para}  GenotypeGVCFs "
         "-R {ref} -V {input.vcf}  -O  {output.vcf} >{log} 2>&1"
@@ -284,7 +324,7 @@ rule gatk_SelectVariants_snp:
     output:
         vcf="05.GATK_SELECT/{sample}/{sample}.raw.snp.vcf.gz"
     log: "log/{sample}/{sample}.SelectVariants_snp.log"
-    benchmark: "05.GATK_SELECT/{sample}/{sample}.SelectVariants_snp.benchmark"
+    benchmark: "log/{sample}/{sample}.SelectVariants_snp.benchmark"
     shell:
         "{gatk}  --java-options {params.para}  SelectVariants "
         "-R {ref} -V {input.vcf}  -select-type SNP -O {output.vcf} >{log} 2>&1"
@@ -298,7 +338,7 @@ rule gatk_SelectVariants_indel:
     output:
         vcf="05.GATK_SELECT/{sample}/{sample}.raw.indel.vcf.gz"
     log: "log/{sample}/{sample}.SelectVariants_indel.log"
-    benchmark: "05.GATK_SELECT/{sample}/{sample}.SelectVariants_indel.benchmark"
+    benchmark: "log/{sample}/{sample}.SelectVariants_indel.benchmark"
     shell:
         "{gatk}  --java-options {params.para}  SelectVariants -R {ref} "
         "-V {input.vcf}  -select-type INDEL -O {output.vcf} >{log} 2>&1"
@@ -316,7 +356,7 @@ rule gatk_filter:
         clean_snp="06.GATK_FILTER/{sample}/{sample}.clean.snp.vcf.gz",
         clean_indel="06.GATK_FILTER/{sample}/{sample}.clean.indel.vcf.gz"
     log: "log/{sample}/{sample}.filter.log"
-    benchmark: "06.GATK_FILTER/{sample}/{sample}.SelectVariants_filter.benchmark"
+    benchmark: "log/{sample}/{sample}.SelectVariants_filter.benchmark"
     shell:
         "{python} {gatk_vqsr_wrapper} --raw_snp_file  {input.raw_snp}   --raw_indel_file {input.raw_indel} "
         " --out_dir {params.out_dir}   --filter_type {filter_type}  >{log} 2>&1"
@@ -331,7 +371,7 @@ rule gatk_MergeVcfs:
     output:
         clean_vcf="06.GATK_FILTER/{sample}/{sample}.clean.vcf.gz"
     log: "log/{sample}/{sample}.MergeVcfs.log"
-    benchmark: "06.GATK_FILTER/{sample}/{sample}.MergeVcfs.benchmark"
+    benchmark: "log/{sample}/{sample}.MergeVcfs.benchmark"
     shell:
         "{gatk}  --java-options {params.para} MergeVcfs -I {input.clean_snp} "
         "-I {input.clean_indel}  -O {output.clean_vcf} >{log} 2>&1"
@@ -349,7 +389,7 @@ rule annovar:
          annovar_input="07.annovar/{sample}/{sample}.annovar.input",
          annovar_vcf="07.annovar/{sample}/{sample}.annovar.myanno.hg19_multianno.vcf"
     log: "log/{sample}/{sample}.annovar.log"
-    benchmark: "07.annovar/{sample}/{sample}.annovar.benchmark"
+    benchmark: "log/{sample}/{sample}.annovar.benchmark"
     shell:
         "gzip -dc {input.clean_vcf} >{output.clean_vcf} && "
         "perl  {convert2annovar} -includeinfo -allsample -withfreq -format vcf4 {output.clean_vcf} >{output.annovar_temp}  2>{log}  && "
@@ -360,6 +400,5 @@ rule annovar:
          --operation g,r,f,f,f,f,f,f  -nastring . -vcfinput \
          --argument '--splicing_threshold 10,,,,,,,'  >{log}  2>&1 "
 
-#质控结果
-#rule result:
+
 

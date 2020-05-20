@@ -1,0 +1,4 @@
+project_dir: /public/wangxiaoqi/WES_PIPLINE/snakemake_dir/tmp_test/demo_test_0512_mutisample
+sample_all: [tissue,blood]
+tissue: /public/exome_project_rawdata/CNYX-GUOLISHAN-TWO-PURE-EXOME/raw_data/LWHM18A0043-GUOLISHAN-ORGAN/R18064819-LPM180087-LWHM18A0043_combined_R1.fastq.gz,/public/exome_project_rawdata/CNYX-GUOLISHAN-TWO-PURE-EXOME/raw_data/LWHM18A0043-GUOLISHAN-ORGAN/R18064819-LPM180087-LWHM18A0043_combined_R2.fastq.gz
+blood: /public/exome_project_rawdata/CNYX-GUOLISHAN-TWO-PURE-EXOME/raw_data/LWHM18B0043-GUOLISHAN-BLOOD/R18064819-LPM180087-LWHM18B0043_combined_R1.fastq.gz,/public/exome_project_rawdata/CNYX-GUOLISHAN-TWO-PURE-EXOME/raw_data/LWHM18B0043-GUOLISHAN-BLOOD/R18064819-LPM180087-LWHM18B0043_combined_R2.fastq.gz
