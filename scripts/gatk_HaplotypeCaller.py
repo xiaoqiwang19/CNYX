@@ -72,10 +72,10 @@ class GATK_HaplotypeCaller():
         for each_chr in  chroms:
             variant_par += f" -I {gatk_hc_dir}/{sample}.{each_chr}.g.vcf.gz "
         print(variant_par)
-
+        #合并用MergeVcfs or GatherVcfs 进一步
         java_shell = f"{self.gatk} " \
                      f"--java-options '-Xmx2G -Djava.io.tmpdir={gatk_hc_dir}' " \
-                    "MergeVcfs  "  \
+                    "GatherVcfs  "  \
                     f"{variant_par} -O {gatk_hc_dir}/{sample}.g.vcf.gz "
         subprocess.check_call(java_shell, shell=True, stdout=stdout, stderr=stderr)
         return f"{gatk_hc_dir}/{sample}.g.vcf.gz"

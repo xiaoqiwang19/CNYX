@@ -22,7 +22,8 @@ r1_q_mean = j["read1_before_filtering"]["quality_curves"]["mean"]
 r2_q_mean = j["read2_before_filtering"]["quality_curves"]["mean"]
 q_mean = r1_q_mean + r2_q_mean
 
-x_values = range(1, 301)
+#x_values = range(1, 301)
+x_values = range(1, len(q_mean)+1)
 y_values = q_mean
 
 '''
@@ -31,8 +32,9 @@ x:横坐标 y:纵坐标 s:点的尺寸
 '''
 
 plt.scatter(x_values,y_values, s=10)
-plt.axvline(150, linestyle="--", linewidth=1, color='r')#99表示横坐标
- 
+#plt.axvline(150, linestyle="--", linewidth=1, color='r')#99表示横坐标
+plt.axvline(len(r1_q_mean), linestyle="--", linewidth=1, color='r')#99表示横坐标 
+
 # 设置图表标题并给坐标轴加上标签
 plt.title('raw quality distribution', fontsize=24)
 plt.xlabel('reads position', fontsize=14)
@@ -54,7 +56,7 @@ ax.xaxis.set_major_locator(x_major_locator)
 #把x轴的主刻度设置为50的倍数
 ax.yaxis.set_major_locator(y_major_locator)
 #把y轴的主刻度设置为10的倍数
-plt.xlim(1,300)
+plt.xlim(1,len(q_mean))
 #把x轴的刻度范围设置为-0.5到11，因为0.5不满一个刻度间隔，所以数字不会显示出来，但是能看到一点空白
 plt.ylim(0,50)
 
@@ -70,7 +72,8 @@ r1_q_mean = j["read1_after_filtering"]["quality_curves"]["mean"]
 r2_q_mean = j["read2_after_filtering"]["quality_curves"]["mean"]
 q_mean = r1_q_mean + r2_q_mean
 
-x_values = range(1, 301)
+#x_values = range(1, 301)
+x_values = range(1, len(q_mean)+1)
 y_values = q_mean
 
 '''
@@ -79,7 +82,7 @@ x:横坐标 y:纵坐标 s:点的尺寸
 '''
 
 plt.scatter(x_values, y_values, s=10)
-plt.axvline(150, linestyle="--", linewidth=1, color='r')  # 99表示横坐标
+plt.axvline(len(r1_q_mean), linestyle="--", linewidth=1, color='r')  # 99表示横坐标
 
 # 设置图表标题并给坐标轴加上标签
 plt.title('clean quality distribution', fontsize=24)
@@ -99,7 +102,7 @@ ax.xaxis.set_major_locator(x_major_locator)
 #把x轴的主刻度设置为50的倍数
 ax.yaxis.set_major_locator(y_major_locator)
 #把y轴的主刻度设置为10的倍数
-plt.xlim(1,300)
+plt.xlim(1,len(q_mean))
 #把x轴的刻度范围设置为-0.5到11，因为0.5不满一个刻度间隔，所以数字不会显示出来，但是能看到一点空白
 plt.ylim(0,50)
 
@@ -130,7 +133,8 @@ r_G_c = r1_G_c + r2_G_c
 r_C_c = r1_C_c + r2_C_c
 r_N_c = r1_N_c + r2_N_c
 
-x_values = range(1, 301)
+#x_values = range(1, 301)
+x_values = range(1, len(r_A_c)+1)
 a_y_values = r_A_c
 t_y_values = r_T_c
 g_y_values = r_G_c
@@ -147,7 +151,7 @@ plt.plot(x_values,n_y_values,color="purple",label="N")
 
 plt.legend(loc="best",markerscale=2.,numpoints=2,scatterpoints=1,fontsize=8)
 
-plt.axvline(150, linestyle="--", linewidth=1, color='r')#99表示横坐标
+plt.axvline(len(r1_A_c), linestyle="--", linewidth=1, color='r')#99表示横坐标
 
 # 设置图表标题并给坐标轴加上标签
 plt.title('raw base content distribution', fontsize=24)
@@ -167,7 +171,7 @@ ax.xaxis.set_major_locator(x_major_locator)
 #把x轴的主刻度设置为50的倍数
 ax.yaxis.set_major_locator(y_major_locator)
 #把y轴的主刻度设置为10的倍数
-plt.xlim(1,300)
+plt.xlim(1,len(r_A_c))
 #把x轴的刻度范围设置为-0.5到11，因为0.5不满一个刻度间隔，所以数字不会显示出来，但是能看到一点空白
 plt.ylim(0,50)
 
@@ -197,7 +201,8 @@ r_G_c = r1_G_c + r2_G_c
 r_C_c = r1_C_c + r2_C_c
 r_N_c = r1_N_c + r2_N_c
 
-x_values = range(1, 301)
+#x_values = range(1, 301)
+x_values = range(1, len(r_A_c) +1 )
 a_y_values = r_A_c
 t_y_values = r_T_c
 g_y_values = r_G_c
@@ -214,7 +219,7 @@ plt.plot(x_values,n_y_values,color="purple",label="N")
 
 plt.legend(loc="best",markerscale=2.,numpoints=2,scatterpoints=1,fontsize=8)
 
-plt.axvline(150, linestyle="--", linewidth=1, color='r')#99表示横坐标
+plt.axvline(len(r1_A_c), linestyle="--", linewidth=1, color='r')#99表示横坐标
 
 # 设置图表标题并给坐标轴加上标签
 plt.title('clean base content distribution', fontsize=24)
@@ -234,7 +239,7 @@ ax.xaxis.set_major_locator(x_major_locator)
 #把x轴的主刻度设置为50的倍数
 ax.yaxis.set_major_locator(y_major_locator)
 #把y轴的主刻度设置为10的倍数
-plt.xlim(1,300)
+plt.xlim(1,len(r_A_c))
 #把x轴的刻度范围设置为-0.5到11，因为0.5不满一个刻度间隔，所以数字不会显示出来，但是能看到一点空白
 plt.ylim(0,50)
 
